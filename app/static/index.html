@@ -1,0 +1,37 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10"><link rel="manifest" href="/manifest.webmanifest">
+<title>Iris LPIPS v2</title><style>
+*{box-sizing:border-box}body{margin:0;background:#0b0d10;color:#f5f6f7;font-family:-apple-system,sans-serif}
+main{max-width:760px;margin:auto;padding:18px 14px 50px}.muted{color:#a6afb9;line-height:1.5}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{background:#15191f;border:1px solid #2b3139;border-radius:17px;padding:11px}.stage{position:relative;aspect-ratio:1;margin-top:9px;background:#080a0c;overflow:hidden}
+.stage img{width:100%;height:100%;object-fit:contain}.circle{position:absolute;border:2px solid white;border-radius:50%;pointer-events:none;box-shadow:0 0 0 999px #0005}
+label{font-size:12px;color:#a6afb9}.ctl{margin-top:8px}.ctl input{width:100%}.btn{width:100%;border:0;border-radius:14px;padding:15px;margin-top:12px;font-size:16px;font-weight:750}
+.go{background:#f5f6f7;color:#090b0d}.reset{background:#252b33;color:white}.big{font-size:32px;font-weight:800}.row{display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid #2b3139}
+@media(max-width:520px){.grid{gap:7px}.card{padding:8px}h1{font-size:25px}}
+</style></head><body><main><h1>Completed Mass LPIPS v2</h1>
+<p class="muted">白円を虹彩外周へ合わせます。中心X/Yと半径をA・Bで独立調整し、同一径化してから σ16/32/48 Low-pass → 実LPIPSを行います。</p>
+<div class="grid" id="grid"></div><button class="btn go" id="go">実LPIPSを実行</button>
+<button class="btn reset" id="reset">リセット</button><div class="card" id="out" style="margin-top:12px"><span class="muted">画像A/Bを選択してください。</span></div>
+<p class="muted" style="font-size:12px">色・白目・目元はLPIPS入力前に除外します。LPIPSの生distanceを表示し、独自100点換算は行いません。</p>
+</main><script>
+const S={};
+function pane(k){return `<div class="card"><b>画像${k}</b><input id="f${k}" type="file" accept="image/*">
+<div class="stage" id="s${k}"><img id="i${k}"><div class="circle" id="c${k}"></div></div>
+<div class="ctl"><label>中心 X</label><input id="x${k}" type="range" min="0" max="1" step=".002" value=".5"></div>
+<div class="ctl"><label>中心 Y</label><input id="y${k}" type="range" min="0" max="1" step=".002" value=".5"></div>
+<div class="ctl"><label>半径</label><input id="r${k}" type="range" min=".08" max=".5" step=".002" value=".35"></div></div>`}
+document.getElementById('grid').innerHTML=pane('A')+pane('B');
+function update(k){let x=+document.getElementById('x'+k).value,y=+document.getElementById('y'+k).value,r=+document.getElementById('r'+k).value,c=document.getElementById('c'+k);
+c.style.width=c.style.height=(r*200)+'%';c.style.left=(x-r)*100+'%';c.style.top=(y-r)*100+'%'}
+for(const k of ['A','B']){for(const q of ['x','y','r'])document.getElementById(q+k).oninput=()=>update(k);
+document.getElementById('f'+k).onchange=e=>{let f=e.target.files[0];if(f)document.getElementById('i'+k).src=URL.createObjectURL(f)};update(k)}
+document.getElementById('reset').onclick=()=>location.reload();
+document.getElementById('go').onclick=async()=>{let fa=document.getElementById('fA').files[0],fb=document.getElementById('fB').files[0],o=document.getElementById('out');
+if(!fa||!fb){o.textContent='画像A/Bを両方選択してください。';return}let d=new FormData();d.append('a',fa);d.append('b',fb);
+for(const [p,k] of [['a','A'],['b','B']]){d.append(p+'cx',document.getElementById('x'+k).value);d.append(p+'cy',document.getElementById('y'+k).value);d.append(p+'r',document.getElementById('r'+k).value)}
+o.textContent='LPIPS推論中…';try{let r=await fetch('/api/compare',{method:'POST',body:d}),z=await r.json();if(!r.ok)throw Error(z.detail||'error');
+o.innerHTML=`<div class="muted">Multi-scale mean LPIPS</div><div class="big">${z.mean_lpips_distance.toFixed(6)}</div>`+
+z.scales.map(v=>`<div class="row"><span>σ=${v.sigma}</span><b>${v.lpips_distance.toFixed(6)}</b></div>`).join('')+`<p class="muted">${z.note}</p>`;
+}catch(e){o.textContent='実行エラー: '+e.message}}
+</script></body></html>
