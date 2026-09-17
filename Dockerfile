@@ -11,8 +11,8 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-# AlexNet / LPIPS weights をビルド時に取得
-RUN python -c "import lpips; lpips.LPIPS(net='alex')"
+
+
 
 COPY app ./app
 
